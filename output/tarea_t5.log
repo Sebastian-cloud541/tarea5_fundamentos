@@ -2,7 +2,7 @@
       name:  <unnamed>
        log:  C:\Users\Cata y Seba\Documents\GitHub\tarea5_fundamentos\output/tarea_t5.log
   log type:  text
- opened on:  19 Nov 2026, 17:41:15
+ opened on:  19 Nov 2026, 17:41:41
 
 . 
 . 
@@ -37,7 +37,7 @@
 . * --- global: viven en toda la sesión de Stata. Las uso solo para lo que
 . *     quisiera compartir con otros do-files del proyecto (el umbral de
 . *     ingreso y la fuente de los datos son los mismos en todo el análisis).
-. global umbral = 600000
+. global umbral = 500000
 
 . global fuente "CASEN, muestra del curso (60 personas)"
 
@@ -357,10 +357,10 @@ Media de ingreso en miles:     655.3
 
 . 
 . count if `depvar' > $umbral                        // MAL: incluye a los missing
-  39
+  46
 
 . count if `depvar' > $umbral & !missing(`depvar')   // BIEN
-  34
+  41
 
 . 
 . /*
@@ -511,5 +511,5 @@ file output/tarea_t5_por_sector.xlsx saved
       name:  <unnamed>
        log:  C:\Users\Cata y Seba\Documents\GitHub\tarea5_fundamentos\output/tarea_t5.log
   log type:  text
- closed on:  19 Nov 2026, 17:41:16
+ closed on:  19 Nov 2026, 17:41:42
 ---------------------------------------------------------------------------------------------------------------------------------------
