@@ -1,0 +1,515 @@
+---------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Cata y Seba\Documents\GitHub\tarea5_fundamentos\output/tarea_t5.log
+  log type:  text
+ opened on:  19 Nov 2026, 17:40:50
+
+. 
+. 
+. 
+. * 1. PARÁMETROS (lo único que se edita)
+. * local: viven solo mientras corre este do-file.
+. local datos      "data/raw/casen_reducido.csv"
+
+. local depvar     "ingreso"                         // variable dependiente
+
+. local xprin      "educ"                            // regresor principal 
+
+. local controles  "experiencia"                     // controles adicionales
+
+. local numericas  "ingreso educ edad experiencia"   // variables para los descriptivos
+
+. local grupos     "sector region genero"            // grupos para el programa de descriptivos
+
+. local grupo_reg  "sector"                          // grupo para las regresiones por separado
+
+. local var_tramos "educ"                            // variable que se corta en tramos
+
+. local t_ini      = 4                               // primer tramo
+
+. local t_paso     = 4                               // ancho de cada tramo
+
+. local t_fin      = 20                              // último tramo
+
+. local excel      "output/tarea_t5_por_sector.xlsx"
+
+. 
+. * --- global: viven en toda la sesión de Stata. Las uso solo para lo que
+. *     quisiera compartir con otros do-files del proyecto (el umbral de
+. *     ingreso y la fuente de los datos son los mismos en todo el análisis).
+. global umbral = 500000
+
+. global fuente "CASEN, muestra del curso (60 personas)"
+
+. 
+. 
+. * 2. CARGAR Y PREPARAR LOS DATOS
+. import delimited "`datos'", clear varnames(1) encoding("utf-8")
+(6 vars, 60 obs)
+
+. describe, short
+
+Contains data
+  obs:            60                          
+ vars:             6                          
+Sorted by: 
+     Note: Dataset has changed since last saved.
+
+. 
+. * Experiencia potencial de Mincer 
+. generate experiencia = max(edad - educ - 6, 0)
+
+. label variable experiencia "Experiencia potencial (años)"
+
+. 
+. * Indicadora 0/1 de sexo con etiquetas de valores.
+. generate mujer = (genero == "F")
+
+. label variable mujer "Mujer (1 = sí)"
+
+. label define mujer_lbl 0 "Hombre" 1 "Mujer"
+
+. label values mujer mujer_lbl
+
+. 
+. label variable ingreso "Ingreso mensual ($)"
+
+. label variable educ    "Años de educación"
+
+. 
+. tabulate mujer
+
+ Mujer (1 = |
+        sí) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+     Hombre |         31       51.67       51.67
+      Mujer |         29       48.33      100.00
+------------+-----------------------------------
+      Total |         60      100.00
+
+. 
+. 
+. 
+. * 3. foreach SOBRE UNA LISTA DE VARIABLES
+. * Reemplaza los summarize repetidos
+. foreach v of local numericas {
+  2.     display _newline "===== `v' ====="
+  3.     summarize `v', detail
+  4. }
+
+===== ingreso =====
+
+                     Ingreso mensual ($)
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%       180000         180000
+ 5%       276000         226000
+10%       384000         276000       Obs                  55
+25%       497000         363000       Sum of Wgt.          55
+
+50%       672000                      Mean           655290.9
+                        Largest       Std. Dev.      209912.4
+75%       807000         959000
+90%       948000         975000       Variance       4.41e+10
+95%       975000         987000       Skewness      -.1743242
+99%      1093000        1093000       Kurtosis       2.407897
+
+===== educ =====
+
+                     Años de educación
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            6              6
+ 5%            7              7
+10%            9              7       Obs                  60
+25%         10.5              7       Sum of Wgt.          60
+
+50%         12.5                      Mean           12.73333
+                        Largest       Std. Dev.      3.328697
+75%           15             18
+90%           17             19       Variance       11.08023
+95%         18.5             20       Skewness       .1798646
+99%           20             20       Kurtosis       2.493514
+
+===== edad =====
+
+                            edad
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%           20             20
+ 5%         21.5             20
+10%         22.5             21       Obs                  60
+25%           32             22       Sum of Wgt.          60
+
+50%         45.5                      Mean           44.51667
+                        Largest       Std. Dev.      15.15959
+75%         57.5             68
+90%           64             69       Variance       229.8133
+95%         68.5             69       Skewness      -.0681735
+99%           70             70       Kurtosis       1.791894
+
+===== experiencia =====
+
+                Experiencia potencial (años)
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            3              2
+10%            5              2       Obs                  60
+25%         10.5              4       Sum of Wgt.          60
+
+50%           27                      Mean           25.78333
+                        Largest       Std. Dev.       15.3182
+75%           36             48
+90%           47             50       Variance       234.6472
+95%           49             52       Skewness      -.0345026
+99%           53             53       Kurtosis       1.783916
+
+. 
+. 
+. 
+. * 4. forvalues: CUÁNTAS PERSONAS HAY EN CADA TRAMO
+. * Tramos de educación de 4 años: ¿cuántas personas tienen educación
+. * básica incompleta, media, superior...? count deja el número en r(N).
+. forvalues t = `t_ini'(`t_paso')`t_fin' {
+  2.     quietly count if `var_tramos' >= `t' & `var_tramos' < `t' + `t_paso'
+  3.     display "`var_tramos' de `t' a " `t' + `t_paso' - 1 ": " r(N) " personas"
+  4. }
+educ de 4 a 7: 4 personas
+educ de 8 a 11: 19 personas
+educ de 12 a 15: 25 personas
+educ de 16 a 19: 10 personas
+educ de 20 a 23: 2 personas
+
+. 
+. 
+. 
+. * 5. UN PROGRAMA REUTILIZABLE CON ARGUMENTOS
+. * descriptivos_grupo  grupo  var1  var2
+. *   `1' = variable de grupo; `2' y `3' = variables que se describen.
+. * Las variables se pasan como argumentos y no se leen de las macros del
+. * do-file: dentro de un programa las locales de afuera no existen y se
+. * evalúan como vacías, sin dar error.
+. capture program drop descriptivos_grupo
+
+. program define descriptivos_grupo
+  1.     display _newline "=== Descriptivos por `1' ==="
+  2.     tabulate `1'
+  3.     tabstat `2' `3', by(`1') statistics(mean sd n)
+  4. end
+
+. 
+. * Un solo bloque sirve para todos los grupos de la lista.
+. foreach g of local grupos {
+  2.     descriptivos_grupo `g' `depvar' `xprin'
+  3. }
+
+=== Descriptivos por sector ===
+
+       sector |      Freq.     Percent        Cum.
+--------------+-----------------------------------
+  Agricultura |         13       21.67       21.67
+     Comercio |          6       10.00       31.67
+ Construcción |          5        8.33       40.00
+    Educación |          8       13.33       53.33
+    Industria |         11       18.33       71.67
+    Servicios |         17       28.33      100.00
+--------------+-----------------------------------
+        Total |         60      100.00
+
+Summary statistics: mean, sd, N
+  by categories of: sector 
+
+       sector |   ingreso      educ
+--------------+--------------------
+  Agricultura |  447846.2  12.30769
+              |  156716.2  3.473342
+              |        13        13
+--------------+--------------------
+     Comercio |  523833.3  11.33333
+              |  135666.4  4.546061
+              |         6         6
+--------------+--------------------
+ Construcción |    520800        10
+              |  115694.4  3.391165
+              |         5         5
+--------------+--------------------
+    Educación |  908857.1     16.25
+              |  117920.1  2.434866
+              |         7         8
+--------------+--------------------
+    Industria |  697888.9  13.27273
+              |  154652.4  2.412091
+              |         9        11
+--------------+--------------------
+    Servicios |    788600  12.35294
+              |  112702.4  2.548067
+              |        15        17
+--------------+--------------------
+        Total |  655290.9  12.73333
+              |  209912.4  3.328697
+              |        55        60
+-----------------------------------
+
+=== Descriptivos por region ===
+
+       region |      Freq.     Percent        Cum.
+--------------+-----------------------------------
+    Araucanía |         11       18.33       18.33
+       Biobío |         10       16.67       35.00
+        Maule |         12       20.00       55.00
+Metropolitana |         12       20.00       75.00
+        Ñuble |         15       25.00      100.00
+--------------+-----------------------------------
+        Total |         60      100.00
+
+Summary statistics: mean, sd, N
+  by categories of: region 
+
+       region |   ingreso      educ
+--------------+--------------------
+    Araucanía |    638600  12.27273
+              |  238927.8   4.07654
+              |        10        11
+--------------+--------------------
+       Biobío |    633200      12.3
+              |  190041.4  2.110819
+              |        10        10
+--------------+--------------------
+        Maule |  659272.7  13.33333
+              |  217151.6  3.284491
+              |        11        12
+--------------+--------------------
+Metropolitana |  637636.4  12.91667
+              |  196989.5  3.315483
+              |        11        12
+--------------+--------------------
+        Ñuble |  696692.3  12.73333
+              |  232279.4  3.769552
+              |        13        15
+--------------+--------------------
+        Total |  655290.9  12.73333
+              |  209912.4  3.328697
+              |        55        60
+-----------------------------------
+
+=== Descriptivos por genero ===
+
+     genero |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          F |         29       48.33       48.33
+          M |         31       51.67      100.00
+------------+-----------------------------------
+      Total |         60      100.00
+
+Summary statistics: mean, sd, N
+  by categories of: genero 
+
+genero |   ingreso      educ
+-------+--------------------
+     F |  636296.3  12.96552
+       |  224593.3  3.458765
+       |        27        29
+-------+--------------------
+     M |  673607.1  12.51613
+       |  197088.3  3.244184
+       |        28        31
+-------+--------------------
+ Total |  655290.9  12.73333
+       |  209912.4  3.328697
+       |        55        60
+----------------------------
+
+. 
+. 
+. 
+. * 6. tempvar: UNA VARIABLE INTERMEDIA QUE NO QUEDA EN LOS DATOS
+. tempvar dep_miles
+
+. generate `dep_miles' = `depvar' / 1000
+(5 missing values generated)
+
+. summarize `dep_miles'
+
+    Variable |        Obs        Mean    Std. Dev.       Min        Max
+-------------+---------------------------------------------------------
+    __000000 |         55    655.2909    209.9124        180       1093
+
+. display "Media de `depvar' en miles: " %9.1fc r(mean)
+Media de ingreso en miles:     655.3
+
+. 
+. /*
+>    ¿Por qué tempvar es más seguro que crear una variable y borrarla?
+>    - Stata le da un nombre único (tipo __000000), así que nunca choca con una
+>      variable que ya existe en la base: un generate ingreso_miles fallaría
+>      si ingreso_miles ya estuviera.
+>    - Se borra sola al terminar el do-file, aunque se corte a
+>      la mitad por un error.
+> */
+. 
+. 
+. 
+. * 7. MISSING AL FILTRAR POR EL UMBRAL
+. 
+. count if missing(`depvar')
+  5
+
+. 
+. count if `depvar' > $umbral                        // MAL: incluye a los missing
+  46
+
+. count if `depvar' > $umbral & !missing(`depvar')   // BIEN
+  41
+
+. 
+. /*
+>    Sin & !missing(ingreso), las 5 personas sin ingreso se contarían como si
+>    ganaran más que el umbral. Con el umbral de
+>    500000 el primer count da 46 y el correcto 41.
+> */
+. 
+. 
+. * 8. MODELOS GUARDADOS Y COMPARADOS
+. 
+. quietly regress `depvar' `xprin' `controles'
+
+. estimates store m1
+
+. 
+. quietly regress `depvar' `xprin' `controles' i.mujer
+
+. estimates store m2
+
+. 
+. estimates dir
+
+-------------------------------------------------------
+        name | command      depvar       npar  title 
+-------------+-----------------------------------------
+          m1 | regress      ingreso         3  
+          m2 | regress      ingreso         5  
+-------------------------------------------------------
+
+. estimates table m1 m2, b(%9.0f) se stats(N r2) stfmt(%5.3f)
+
+--------------------------------------
+    Variable |    m1          m2      
+-------------+------------------------
+        educ |     42019       42246  
+             |      6393        6355  
+ experiencia |      -115        -517  
+             |      1415        1440  
+             |
+       mujer |
+      Mujer  |                -55686  
+             |                 43302  
+             |
+       _cons |    124160      158713  
+             |     94837       98002  
+-------------+------------------------
+           N |        55          55  
+          r2 |     0.458       0.475  
+--------------------------------------
+                          legend: b/se
+
+. 
+. * El coeficiente se lee de e().
+. estimates restore m1
+(results m1 are active now)
+
+. display "m1: cada año de `xprin' se asocia a " %9.0fc _b[`xprin'] ///
+>     " pesos más de `depvar' (ee = " %7.0fc _se[`xprin'] ", N = " e(N) ")"
+m1: cada año de educ se asocia a    42,019 pesos más de ingreso (ee =   6,393, N = 55)
+
+. 
+. estimates restore m2
+(results m2 are active now)
+
+. display "m2: cada año de `xprin' se asocia a " %9.0fc _b[`xprin'] ///
+>     " pesos más de `depvar' (ee = " %7.0fc _se[`xprin'] ", N = " e(N) ")"
+m2: cada año de educ se asocia a    42,246 pesos más de ingreso (ee =   6,355, N = 55)
+
+. display "m2: brecha mujer - hombre = " %9.0fc _b[1.mujer] ///
+>     " pesos (ee = " %7.0fc _se[1.mujer] ")"
+m2: brecha mujer - hombre =   -55,686 pesos (ee =  43,302)
+
+. 
+. 
+. 
+. * 9. UNA REGRESIÓN POR GRUPO, EN UNA MATRIZ, EXPORTADA A EXCEL
+. 
+. levelsof `grupo_reg', local(niveles)
+`"Agricultura"' `"Comercio"' `"Construcción"' `"Educación"' `"Industria"' `"Servicios"'
+
+. local k : word count `niveles'          // cuántos grupos hay
+
+. matrix R = J(`k', 3, .)                 // k filas, 3 columnas, todo missing
+
+. 
+. local i = 1
+
+. foreach s of local niveles {
+  2.     quietly regress `depvar' `xprin' if `grupo_reg' == "`s'"
+  3.     matrix R[`i', 1] = _b[`xprin']      // coeficiente
+  4.     matrix R[`i', 2] = _se[`xprin']     // error estándar
+  5.     matrix R[`i', 3] = e(N)             // cuántas personas
+  6.     local i = `i' + 1
+  7. }
+
+. 
+. matrix colnames R = beta_`xprin' ee n
+
+. matrix rownames R = `niveles'
+
+. matrix list R, format(%9.0f)
+
+R[6,3]
+               beta_educ         ee          n
+  Agricultura      37519       7556         13
+     Comercio      24487       8529          6
+ Construcción      23783      14122          5
+    Educación      37368      12642          7
+    Industria      42713      14514          9
+    Servicios      32308       7924         15
+
+. 
+. * A Excel: encabezados, la matriz desde B2 y los nombres en la columna A.
+. putexcel set "`excel'", replace
+
+. putexcel A1 = ("`grupo_reg'") B1 = ("Beta `xprin'") C1 = ("Error est.") D1 = ("n")
+file output/tarea_t5_por_sector.xlsx saved
+
+. putexcel B2 = matrix(R)
+file output/tarea_t5_por_sector.xlsx saved
+
+. 
+. local fila = 2
+
+. foreach s of local niveles {
+  2.     putexcel A`fila' = ("`s'")
+  3.     local fila = `fila' + 1
+  4. }
+file output/tarea_t5_por_sector.xlsx saved
+file output/tarea_t5_por_sector.xlsx saved
+file output/tarea_t5_por_sector.xlsx saved
+file output/tarea_t5_por_sector.xlsx saved
+file output/tarea_t5_por_sector.xlsx saved
+file output/tarea_t5_por_sector.xlsx saved
+
+. local fila = `fila' + 1                 // una fila en blanco antes de la nota
+
+. putexcel A`fila' = ("Fuente: $fuente. Regresión de `depvar' en `xprin' por `grupo_reg'.")
+file output/tarea_t5_por_sector.xlsx saved
+
+. 
+. 
+. 
+. * 10. CERRAR LA BITÁCORA
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Cata y Seba\Documents\GitHub\tarea5_fundamentos\output/tarea_t5.log
+  log type:  text
+ closed on:  19 Nov 2026, 17:40:51
+---------------------------------------------------------------------------------------------------------------------------------------
